@@ -1,13 +1,13 @@
 #include <stdint.h>
-#include <uart.h>
-#include <gpio.h>
+#include "uart.h"
+#include "gpio.h"
 
 #define UART ((NRF_UART_REG*)0x40002000)
 
 
 typedef struct {
 	volatile uint32_t STARTRX;
-	volatile uint32_t STOPRX:
+	volatile uint32_t STOPRX;
 	volatile uint32_t STARTTX;
 	volatile uint32_t STOPTX;
 	volatile uint32_t RESERVED0[3];
@@ -17,8 +17,8 @@ typedef struct {
 	volatile uint32_t CTS;
 	volatile uint32_t NCTS;
 	volatile uint32_t RXDRDY;
-	volatile uint32_t RESERVEDa[4]
-	volatile uint32_t TXDRDY:
+	volatile uint32_t RESERVEDa[4];
+	volatile uint32_t TXDRDY;
 	volatile uint32_t RESERVED2[1];
 	volatile uint32_t ERROR;
 	volatile uint32_t RESERVED3[7];
@@ -51,20 +51,52 @@ void uart_init() {
 	GPIO->PIN_CNF[25] = 0; // set pin #25 as input
 	GPIO->PIN_CNF[24] = 1; // set pin #24 as output
 
+	UART->PSELRXD = 25;
+	UART->PSELTXD = 24;
+	UART->PSELCTS = 0xFFFFFFFF; //har ikke flytkontroll så disse blir disabled
+	UART->PSELRTS = 0xFFFFFFFF;
+
 	UART->BAUDRATE = 0x00275000; //Set baudrate to 9600
 
-	UART->ENBALE = 4;  // Turn on UART
+	UART->ENABLE = 4;  // Turn on UART (verdi kommer fra datablad)
 
 	UART->STARTRX = 1; // Start recieve
 
 }
 
 void uart_send(char letter) {
-	
 
 	UART->STARTTX = 1;  //start transmitting
+	UART->TXDRDY = 0; 
 	UART->TXD = letter; //write letter to TXD
-	while (!(UART-> TXDRDY)); // if txdrdy er ferdig
-	UART->TXDRDY = 0;
+	while (!UART-> TXDRDY);
 	UART->STOPTX = 1; 
 }
+
+char uart_read() {
+	char letter = '\0';
+	if(UART->RXDRDY){ //vent til rxdrdy er klar
+		letter = UART->RXD;
+		UART->RXDRDY = 0;
+	}
+	return letter;
+}
+
+
+void micro_send() {
+	if (!(GPIO->IN &(1 << 26))) { //sjekk om B er trykket inn
+			uart_send('B');
+	}
+
+	if (!(GPIO->IN &(1 << 17))) { //sjekk om A knapp
+			uart_send('A');
+	}
+
+}
+
+
+
+
+
+
+
